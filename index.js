@@ -1,34 +1,67 @@
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
 const app = express();
+
 app.use(cors());
-app.use(express.json({limit: '10mb'}));
+app.use(express.json({ limit: "10mb" }));
 
 let mensagens = [];
 
-app.post('/save/mensagem', (req, res) => {
-  const msg = req.body;
-  msg.deletedFor = msg.deletedFor || [];
-  mensagens.push(msg);
-  res.json({status:'ok'});
+// ➕ Salvar mensagem
+app.post("/salvar/mensagem", (req, res) => {
+  const mensagem = req.body;
+
+  // cada mensagem terá um ID único
+  mensagem.id = Date.now();
+  mensagem.horario = new Date().toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  mensagens.push(mensagem);
+  res.json({ status: "OK" });
 });
 
-app.get('/get/mensagens', (req, res) => {
-  const user = req.query.user;
-  if(!user) return res.status(400).json({error:'user é obrigatório'});
-  const filtered = mensagens.filter(m => 
-    (m.remetente === user || m.destinatario === user) && 
-    !(m.deletedFor.includes(user))
+// 📩 Obter mensagens (todas ou filtradas por usuário)
+app.get("/obter/mensagens", (req, res) => {
+  const usuario = req.query.usuario;
+  if (!usuario) {
+    return res.status(400).json({ erro: "Usuário não informado" });
+  }
+
+  const filtradas = mensagens.filter(
+    (m) => m.de === usuario || m.para === usuario
   );
-  res.json(filtered);
+
+  res.json(filtradas);
 });
 
-app.post('/delete/mensagem', (req, res) => {
-  const { msgId, user } = req.body;
-  const msg = mensagens.find(m => m.id === msgId);
-  if(msg && !msg.deletedFor.includes(user)) msg.deletedFor.push(user);
-  res.json({status:'deleted'});
+// 🗑️ Limpar conversa entre dois usuários
+app.delete("/apagar/conversa", (req, res) => {
+  const { usuario1, usuario2 } = req.query;
+
+  if (!usuario1 || !usuario2) {
+    return res.status(400).json({ erro: "Usuários não informados" });
+  }
+
+  mensagens = mensagens.filter(
+    (m) =>
+      !(
+        (m.de === usuario1 && m.para === usuario2) ||
+        (m.de === usuario2 && m.para === usuario1)
+      )
+  );
+
+  res.json({ status: "Conversa apagada" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend rodando na porta ${PORT}`));
+// 🔁 Rota padrão
+app.get("/", (req, res) => {
+  res.send("Painel de bate-papo ativo 💬");
+});
+
+app.listen(3000, () => {
+  console.log("Servidor rodando na porta 3000 🚀");
+});
+
+module.exports = app;
